@@ -1,0 +1,29 @@
+# Android/Gradle
+.gradle/
+**/build/
+local.properties
+
+# IDE
+.idea/
+*.iml
+
+# Keystore & secrets
+*.jks
+*.keystore
+signing.properties
+keystore.properties
+gradle.properties
+
+# Outputs & temp
+*.apk
+*.aab
+*.log
+captures/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Keep Gradle wrapper
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
