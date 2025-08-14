@@ -8,6 +8,8 @@ android {
     compileSdk = 34
 
     defaultConfig {
+        // 没有就加上
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         applicationId = "com.zzsyp.livecompose"
         minSdk = 26
         targetSdk = 34
@@ -71,4 +73,12 @@ dependencies {
 
     // 协程
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+
+    // 填补：
+    // 单元测试（test/）
+    testImplementation("junit:junit:4.13.2")
+
+    // 仪器测试（androidTest/）
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
 }
