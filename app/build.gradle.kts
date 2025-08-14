@@ -4,6 +4,19 @@ plugins {
 }
 
 android {
+    // 编译环境
+    // 统一 Java 编译目标到 17
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    // Kotlin 编译目标到 17
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
+
     namespace = "com.zzsyp.livecompose"
     compileSdk = 34
 
