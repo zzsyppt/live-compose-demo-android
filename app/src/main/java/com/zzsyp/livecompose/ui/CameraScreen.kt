@@ -33,6 +33,9 @@ import kotlin.math.max
 import kotlin.math.sqrt
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.DisposableEffect
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
+import androidx.compose.runtime.DisposableEffect
 
 /**
  * 该文件实现了直播应用中的相机功能界面，是应用的核心相机交互模块。
@@ -89,8 +92,16 @@ fun CameraScreen(flavor: String) {
     var showReward by remember { mutableStateOf(false) }
 
     // 权限
-    val req = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
-    LaunchedEffect(Unit) { req.launch(Manifest.permission.CAMERA) }
+    // 权限：等 granted==true 再绑定相机
+    var granted by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+    val req = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
+        granted = ok
+    }
+    LaunchedEffect(Unit) { if (!granted) req.launch(Manifest.permission.CAMERA) }
 
     // 预览视图与 CameraX 绑定
     AndroidView(
@@ -98,14 +109,17 @@ fun CameraScreen(flavor: String) {
         factory = {
             PreviewView(it).apply {
                 layoutParams = FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT)
+                // ↓↓↓ 关键：用 TextureView，避免部分机型 SurfaceView 黑屏
+                implementationMode = PreviewView.ImplementationMode.COMPATIBLE
                 scaleType = PreviewView.ScaleType.FILL_CENTER
             }
         },
         update = { pv ->
-            if (cameraUse == null) {
+            if (granted && cameraUse == null) {
                 scope.launch {
                     val analyzer = FrameAnalyzer(
                         onFrame = { bmp: Bitmap ->
+                            // 你原有的 onFrame 逻辑保持不变
                             val now = System.nanoTime()
                             if (lastFeedNs > 0) feedHz = 1e9f / (now - lastFeedNs)
                             lastFeedNs = now
@@ -140,13 +154,13 @@ fun CameraScreen(flavor: String) {
                                 if (state.shouldSnap && !locked) {
                                     locked = true
                                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    val boxSnapshot = RectF(boxNorm) // 拍照时刻的框
+                                    val boxSnapshot = RectF(boxNorm)
                                     cameraUse?.let { use ->
                                         takeAndSaveWithAICrop(
                                             context = context,
                                             imageCapture = use.imageCapture,
                                             boxNorm = boxSnapshot,
-                                            targetRatios = listOf(1f, 4f / 3f, 3f / 2f, 16f / 9f)
+                                            targetRatios = listOf(1f, 4f/3f, 3f/2f, 16f/9f)
                                         ) {
                                             showReward = true
                                             scope.launch {
@@ -157,18 +171,20 @@ fun CameraScreen(flavor: String) {
                                         }
                                     }
                                 }
-
                             }
                         },
                         downscaleLongSide = 320
                     )
                     val use = bindCameraUseCases(context, lifecycleOwner, pv, analyzer)
                     cameraUse = use
-                    pv.post { contentRectPx = RectF(0f, 0f, pv.width.toFloat(), pv.height.toFloat()) }
+                    pv.post {
+                        contentRectPx = RectF(0f, 0f, pv.width.toFloat(), pv.height.toFloat())
+                    }
                 }
             }
         }
     )
+
 
     // 叠加层
     Box(Modifier.fillMaxSize()) {

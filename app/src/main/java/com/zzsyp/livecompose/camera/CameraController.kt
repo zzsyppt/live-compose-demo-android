@@ -1,12 +1,13 @@
 package com.zzsyp.livecompose.camera
 
 import android.content.Context
-import android.view.ScaleGestureDetector
+import android.view.Surface
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
+import java.util.concurrent.Executors
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 
@@ -17,12 +18,6 @@ data class CameraUseCases(
     val camera: Camera
 )
 
-/**
- * 绑定 CameraX 三件套：Preview / ImageCapture / ImageAnalysis
- * - 预览：16:9（铺屏友好）
- * - 拍照：4:3（更贴近全感光元件）
- * - 分析：RGBA_8888（便于直接转 Bitmap）
- */
 suspend fun bindCameraUseCases(
     context: Context,
     lifecycleOwner: LifecycleOwner,
@@ -31,41 +26,37 @@ suspend fun bindCameraUseCases(
 ): CameraUseCases {
     val provider = getCameraProvider(context)
 
+    // 与 PreviewView 保持一致的旋转
+    val rotation = previewView.display?.rotation ?: Surface.ROTATION_0
+
     val preview = Preview.Builder()
         .setTargetAspectRatio(AspectRatio.RATIO_16_9)
-        .build().also { it.setSurfaceProvider(previewView.surfaceProvider) }
+        .setTargetRotation(rotation)
+        .build().also {
+            it.setSurfaceProvider(previewView.surfaceProvider)
+        }
 
     val imageCapture = ImageCapture.Builder()
         .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
         .setTargetAspectRatio(AspectRatio.RATIO_4_3)
+        .setTargetRotation(rotation)
         .build()
 
     val imageAnalysis = ImageAnalysis.Builder()
         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-        .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
-        .setTargetAspectRatio(AspectRatio.RATIO_4_3) // ← 新增：与拍照 4:3 对齐，便于归一化坐标复用
+        .setTargetAspectRatio(AspectRatio.RATIO_4_3)
+        .setTargetRotation(rotation)
         .build().also {
-            it.setAnalyzer(ContextCompat.getMainExecutor(context), analyzer)
+            // 后台线程跑分析，避免阻塞主线程
+            val exec = Executors.newSingleThreadExecutor()
+            it.setAnalyzer(exec, analyzer)
         }
 
     val selector = CameraSelector.DEFAULT_BACK_CAMERA
     provider.unbindAll()
-    val camera = provider.bindToLifecycle(lifecycleOwner, selector, preview, imageCapture, imageAnalysis)
-
-    // 手势缩放（在 PreviewView 上捏合即可缩放）
-    val detector = ScaleGestureDetector(context,
-        object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
-            override fun onScale(detector: ScaleGestureDetector): Boolean {
-                val info = camera.cameraInfo.zoomState.value ?: return false
-                val current = info.zoomRatio
-                val max = info.maxZoomRatio
-                val min = info.minZoomRatio
-                val next = (current * detector.scaleFactor).coerceIn(min, max)
-                camera.cameraControl.setZoomRatio(next)
-                return true
-            }
-        })
-    previewView.setOnTouchListener { _, ev -> detector.onTouchEvent(ev) }
+    val camera = provider.bindToLifecycle(
+        lifecycleOwner, selector, preview, imageCapture, imageAnalysis
+    )
 
     return CameraUseCases(preview, imageCapture, imageAnalysis, camera)
 }
