@@ -30,7 +30,10 @@ android {
     }
 
     // —— Jetpack Compose —— //
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        buildConfig = true   // ← 显式开启 BuildConfig 生成
+    }
     composeOptions {
         // 用 AS 建议版本也可以；只要与本地 Kotlin/Compose 匹配即可
         kotlinCompilerExtensionVersion = "1.5.15"
