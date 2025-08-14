@@ -43,6 +43,7 @@ suspend fun bindCameraUseCases(
     val imageAnalysis = ImageAnalysis.Builder()
         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
         .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
+        .setTargetAspectRatio(AspectRatio.RATIO_4_3) // ← 新增：与拍照 4:3 对齐，便于归一化坐标复用
         .build().also {
             it.setAnalyzer(ContextCompat.getMainExecutor(context), analyzer)
         }

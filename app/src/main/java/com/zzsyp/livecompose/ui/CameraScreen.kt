@@ -1,4 +1,8 @@
 package com.zzsyp.livecompose.ui
+import android.content.Context
+import android.net.Uri
+import androidx.compose.material3.Text
+import com.zzsyp.livecompose.util.*
 
 import android.Manifest
 import android.graphics.Bitmap
@@ -136,8 +140,14 @@ fun CameraScreen(flavor: String) {
                                 if (state.shouldSnap && !locked) {
                                     locked = true
                                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    cameraUse?.let {
-                                        takePicture(it.imageCapture) {
+                                    val boxSnapshot = RectF(boxNorm) // 拍照时刻的框
+                                    cameraUse?.let { use ->
+                                        takeAndSaveWithAICrop(
+                                            context = context,
+                                            imageCapture = use.imageCapture,
+                                            boxNorm = boxSnapshot,
+                                            targetRatios = listOf(1f, 4f / 3f, 3f / 2f, 16f / 9f)
+                                        ) {
                                             showReward = true
                                             scope.launch {
                                                 delay(800)
@@ -147,6 +157,7 @@ fun CameraScreen(flavor: String) {
                                         }
                                     }
                                 }
+
                             }
                         },
                         downscaleLongSide = 320
@@ -190,6 +201,57 @@ private fun takePicture(
             override fun onCaptureSuccess(image: androidx.camera.core.ImageProxy) {
                 image.close(); onDone()
             }
+            override fun onError(exception: ImageCaptureException) {
+                onDone()
+            }
+        }
+    )
+}
+
+/**
+ * 添加新的拍照保存函数（替换你之前的 takePicture(...) 整段）
+ */
+private fun takeAndSaveWithAICrop(
+    context: Context,
+    imageCapture: ImageCapture,
+    boxNorm: RectF,
+    targetRatios: List<Float>,
+    onDone: () -> Unit
+) {
+    val name = generateName("LiveCompose")
+    val output = createOutputOptions(context, name)
+
+    val executor = java.util.concurrent.Executors.newSingleThreadExecutor()
+    imageCapture.takePicture(
+        output, executor,
+        object : ImageCapture.OnImageSavedCallback {
+            override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
+                val uri: Uri? = outputFileResults.savedUri
+                if (uri == null) {
+                    onDone(); return
+                }
+                // 在后台线程做解码与裁剪保存
+                executor.execute {
+                    try {
+                        val bmp = decodeBitmapScaled(context.contentResolver, uri, maxLongSide = 3000)
+                        // 将模型框“最小扩张”到常见比例之一
+                        val snapped = snapToBestAspect(boxNorm, targetRatios)
+                        val cropped = cropBitmapNormalized(bmp, snapped)
+
+                        // 保存 AI 构图版
+                        val aiName = "${name}_AI"
+                        saveBitmapToAlbum(context, cropped, aiName)
+
+                        bmp.recycle()
+                        cropped.recycle()
+                    } catch (_: Throwable) {
+                        // 忽略失败，至少原图已保存
+                    } finally {
+                        onDone()
+                    }
+                }
+            }
+
             override fun onError(exception: ImageCaptureException) {
                 onDone()
             }
