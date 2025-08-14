@@ -34,7 +34,12 @@ import kotlinx.coroutines.*
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt
-
+import androidx.compose.material3.Text
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 private enum class FlowPhase { IDLE, PROPOSED, ALIGNING, ZOOMING, CAPTURING }
 
 @Composable
@@ -84,7 +89,7 @@ fun CameraScreen(flavor: String) {
     var sampling by remember { mutableStateOf(false) }
     var showReward by remember { mutableStateOf(false) }
     var locked by remember { mutableStateOf(false) } // 保持原语义：进入快门阶段短暂锁定
-
+    var sampleCount by remember { mutableIntStateOf(0) }  // 成功更新裁切框的次数
     // —— 进度保护（防止“正确移动”被误判为场景变化而重采样） —— //
     var bestErr by remember { mutableStateOf(1f) }                  // 当前轮对齐过程的最小误差
     var lastProgressTs by remember { mutableStateOf(0L) }           // 最近一次“误差有改善”的时间
@@ -200,6 +205,10 @@ fun CameraScreen(flavor: String) {
                                     bestErr = 1f
                                     lastProgressTs = nowMs
                                     phase = FlowPhase.PROPOSED
+                                    // +++ 新增：成功更新裁切框 → 计数 +1
+                                    withContext(Dispatchers.Main) {
+                                        sampleCount += 1
+                                    }
                                     sampling = false
                                 }
                             }
@@ -281,6 +290,15 @@ fun CameraScreen(flavor: String) {
             flavor = flavor,
             zSuggested = 1f / sqrt(max(1e-5f, boxNorm.width()*boxNorm.height()))
         )
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(8.dp)
+                .background(Color(0x66000000), RoundedCornerShape(8.dp))
+                .padding(horizontal = 10.dp, vertical = 6.dp)
+        ) {
+            Text(text = "samples: $sampleCount", color = Color.White)
+        }
         if (showReward) RewardFlash()
     }
 }
