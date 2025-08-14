@@ -60,4 +60,10 @@ class ZoomControl(
         }
     }
 
+    fun currentZoom(): Float? = camera.cameraInfo.zoomState.value?.zoomRatio
+    suspend fun resetTo(base: Float = 1.0f, steps: Int = 10, stepDelayMs: Long = 16L) {
+        rampToAndWait(base, steps, stepDelayMs)
+    }
+
+
 }
