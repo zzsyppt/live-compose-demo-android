@@ -52,7 +52,7 @@ suspend fun bindCameraUseCases(
             it.setAnalyzer(exec, analyzer)
         }
 
-    val selector = CameraSelector.DEFAULT_BACK_CAMERA
+    val selector = ultraWideBackSelector()
     provider.unbindAll()
     val camera = provider.bindToLifecycle(
         lifecycleOwner, selector, preview, imageCapture, imageAnalysis

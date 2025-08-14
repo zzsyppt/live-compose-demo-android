@@ -45,4 +45,19 @@ class ZoomControl(
             }
         }
     }
+
+    suspend fun rampToAndWait(targetRatio: Float, steps: Int = 10, stepDelayMs: Long = 16L) {
+        val info = camera.cameraInfo.zoomState.value ?: return
+        val min = info.minZoomRatio
+        val max = info.maxZoomRatio
+        val target = targetRatio.coerceIn(min, max)
+        val start = info.zoomRatio
+        for (i in 1..steps) {
+            val t = i / steps.toFloat()
+            val z = start + (target - start) * t
+            camera.cameraControl.setZoomRatio(z)
+            kotlinx.coroutines.delay(stepDelayMs)
+        }
+    }
+
 }
